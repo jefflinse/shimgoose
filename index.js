@@ -14,29 +14,35 @@ async function main() {
   });
 
   tacoSchema.methods.style = function () {
-    return (this.spicy ? 'spicy' : 'plain') + ' ' + this.protein + ' taco';
+    return this._id + ': ' + (this.spicy ? 'spicy' : 'plain') + ' ' + this.protein + ' taco';
   };
 
-  tacoSchema.pre('find', function () {
-    console.log('Pre-find middleware');
-    console.log(this.getFilter());
+  tacoSchema.pre('findOne', function () {
+    console.log('findOne() ' + this.getFilter()._id);
   });
 
   const Taco = mongoose.model('Taco', tacoSchema);
 
+  // Add some test data
   await Taco.deleteMany()
 
   const plainVeggie = new Taco({ protein: 'veggie', spicy: false });
+  await plainVeggie.save();
   console.log(plainVeggie.style());
+
   const spicyChicken = new Taco({ protein: 'chicken', spicy: true });
+  await spicyChicken.save();
   console.log(spicyChicken.style());
 
-  await plainVeggie.save();
-  await spicyChicken.save();
-  
-  let tacos = await Taco.find();
+  // Queries
+  // let tacos = await Taco.find();
+  // console.log(tacos);
+
+  console.log('finding one...');
+  tacos = await Taco.findOne({ _id: spicyChicken._id });
   console.log(tacos);
 
-  tacos = await Taco.find({ protein: /^chi/ });
+  console.log('finding by id...');
+  tacos = await Taco.findById(spicyChicken._id);
   console.log(tacos);
 }
