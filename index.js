@@ -14,12 +14,12 @@ async function fetchTacosFromExternalAPI(mongo_id) {
   return externalTacoData[mongo_id]
 }
 
-// store original Query.exec function so we can forward any non-intercepted to MongoDB
+// store the original Query.exec function so we can forward any non-intercepted calls to MongoDB
 const exec = mongoose.Query.prototype.exec
 
 // redefine the Query.exec function to fetch data from our API in some cases,
 // and to call the original exec function otherwise
-mongoose.Query.prototype.exec = async function(a,b) {
+mongoose.Query.prototype.exec = async function() {
   console.log(`Query.exec(${this.op}) called`);
   
   if (this.op === 'findOne') {
@@ -69,6 +69,15 @@ async function main() {
   const tacoSchema = new mongoose.Schema({
     protein: String,
     spicy: false,
+  });
+
+  // pre/post hooks should continue to work as expected
+  tacoSchema.pre('findOne', function(next) {
+    console.log('pre findOne');
+    next();
+  });
+  tacoSchema.post('findOne', function() {
+    console.log('post findOne');
   });
 
 
