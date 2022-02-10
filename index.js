@@ -17,7 +17,14 @@ async function main() {
     return (this.spicy ? 'spicy' : 'plain') + ' ' + this.protein + ' taco';
   };
 
+  tacoSchema.pre('find', function () {
+    console.log('Pre-find middleware');
+    console.log(this.getFilter());
+  });
+
   const Taco = mongoose.model('Taco', tacoSchema);
+
+  await Taco.deleteMany()
 
   const plainVeggie = new Taco({ protein: 'veggie', spicy: false });
   console.log(plainVeggie.style());
