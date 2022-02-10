@@ -20,6 +20,7 @@ const exec = mongoose.Query.prototype.exec
 // redefine the Query.exec function to fetch data from our API in some cases,
 // and to call the original exec function otherwise
 mongoose.Query.prototype.exec = async function(a,b) {
+  console.log(`Query.exec(${this.op}) called`);
   
   if (this.op === 'findOne') {
     console.log(`intercepting '${this.op}' query execution, fetching from external API instead`);
