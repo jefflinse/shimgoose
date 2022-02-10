@@ -1,5 +1,27 @@
 const mongoose = require('mongoose');
 
+// store original Query.exec function
+const exec = mongoose.Query.prototype.exec
+
+// reassign Query.exec function to fetch data from our API instead
+mongoose.Query.prototype.exec = function(a,b) {
+  console.log('intercepting query execution');
+  console.log(this)
+
+  if (this.op === 'findOne') {
+    const content = {
+      protein: 'black bean',
+      spicy: true,
+    };
+
+    return Array.isArray(content)
+          ? Promise.resolve(content.map(doc => new this.model(doc)))
+          : Promise.resolve(new this.model(content))
+  }
+
+  return exec.apply(this, arguments);
+}
+
 main().catch(err => console.log(err));
 
 async function main() {
@@ -17,32 +39,39 @@ async function main() {
     return this._id + ': ' + (this.spicy ? 'spicy' : 'plain') + ' ' + this.protein + ' taco';
   };
 
-  tacoSchema.pre('findOne', function () {
-    console.log('findOne() ' + this.getFilter()._id);
-  });
-
   const Taco = mongoose.model('Taco', tacoSchema);
 
-  // Add some test data
-  await Taco.deleteMany()
+  const [plainVeggie, spicyChicken] = await populateData(Taco);
 
-  const plainVeggie = new Taco({ protein: 'veggie', spicy: false });
-  await plainVeggie.save();
-  console.log(plainVeggie.style());
+  // Taco.findById = function (id, projection, options) {
+  //   return Taco.findOne({ _id: id });
+  // };
 
-  const spicyChicken = new Taco({ protein: 'chicken', spicy: true });
-  await spicyChicken.save();
-  console.log(spicyChicken.style());
+  // Taco.findOne = function(filter, projection, options) {
+  //   console.log('findOne() ' + filter._id);
+  //   return new Taco({
+  //     _id: filter._id,
+  //     protein: 'black bean',
+  //     spicy: true,
+  //   })
+  // }
 
-  // Queries
-  // let tacos = await Taco.find();
-  // console.log(tacos);
+  console.log('calling Taco.findOne()');
+  let taco = await Taco.findOne({ _id: spicyChicken._id });
+  console.log(taco);
+}
 
-  console.log('finding one...');
-  tacos = await Taco.findOne({ _id: spicyChicken._id });
-  console.log(tacos);
+async function populateData(t) {
+    // Add some test data
+    await t.deleteMany()
 
-  console.log('finding by id...');
-  tacos = await Taco.findById(spicyChicken._id);
-  console.log(tacos);
+    const plainVeggie = new t({ protein: 'veggie', spicy: false });
+    await plainVeggie.save();
+    console.log(plainVeggie.style());
+  
+    const spicyChicken = new t({ protein: 'chicken', spicy: true });
+    await spicyChicken.save();
+    console.log(spicyChicken.style());
+
+    return [plainVeggie, spicyChicken];
 }
