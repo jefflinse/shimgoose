@@ -66,9 +66,12 @@ mongoose.Query.prototype.exec = function exec(op, callback) {
         let tacos = [];
 
         // DIRTY WAY
-        // execute the underlying MongoDB thunk and discard the result
+        // Execute the underlying MongoDB thunk and discard the result.
+        // This still isn't really correct, as both the pre and post hooks will be run
+        // before our API call is executed, meaning that the post hooks will not
+        // have access to the data returned by the API, and will instead run on whatever
+        // was (or wasn't) found in MongoDB.
         this[thunk].call(this, (error, res) => {})
-        // DIRTY WAY
 
         fetchTacosFromExternalAPI(this.getQuery()._id)
           .then(tacos => {
