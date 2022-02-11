@@ -20,29 +20,31 @@ const exec = mongoose.Query.prototype.exec
 // redefine the Query.exec function to fetch data from our API in some cases,
 // and to call the original exec function otherwise
 mongoose.Query.prototype.exec = async function() {
-  console.log(`Query.exec(${this.op}) called`);
-  
-  if (this.op === 'findOne') {
-    console.log(`intercepting '${this.op}' query execution, fetching from external API instead`);
-    let tacos = [];
-    try {
-      tacos = await fetchTacosFromExternalAPI(this.getQuery()._id)
-      if (tacos.length > 0) {
-        tacos = tacos.map(taco => {
-          taco._id = taco.mongo_id
-          return taco
-        });
-        tacos = tacos.map(taco => new this.model(taco))
-      }
-    } catch (e) {
-      console.log('error fetching tacos from external API', e);
-    }
-    
-    return tacos[0] || null;
-  }
+  return new Promise( async (resolve,reject)  => {
+    console.log(`Query.exec(${this.op}) called`);
 
-  // non-intercepted queries will be forwarded to MongoDB
-  return exec.apply(this, arguments);
+    if (this.op === 'findOne') {
+      console.log(`intercepting '${this.op}' query execution, fetching from external API instead`);
+      let tacos = [];
+      try {
+        tacos = await fetchTacosFromExternalAPI(this.getQuery()._id)
+        if (tacos.length > 0) {
+          tacos = tacos.map(taco => {
+            taco._id = taco.mongo_id
+            resolve(taco)
+          });
+          tacos = await tacos.map(taco => new this.model(taco))
+        }
+      } catch (e) {
+        console.log('error fetching tacos from external API', e);
+      }
+
+      resolve(tacos[0] || null);
+    }
+
+    // non-intercepted queries will be forwarded to MongoDB
+    resolve(exec.apply(this, arguments));
+  });
 }
 
 // Populate MongoDB with some sample data
@@ -54,7 +56,6 @@ async function populateData(t) {
 }
 
 main().catch(err => console.log(err));
-
 
 
 // --- MAIN ---------------------------------------------------------------------
@@ -70,6 +71,13 @@ async function main() {
     protein: String,
     spicy: false,
   });
+
+  const burritoSchema = new mongoose.Schema( {
+    protein: String,
+    spicy: false,
+  });
+
+  console.log('before hooks');
 
   // pre/post hooks should continue to work as expected
   tacoSchema.pre('findOne', function(next) {
@@ -92,6 +100,13 @@ async function main() {
 
   // this findOne call will be intercepted and will return data from our API instead
   console.log('attempting to find a taco that only exists in the external API');
-  let taco = await Taco.findOne({ _id: "62056e13d30a1cb15f585ce5" /* chorizo (external data) */ });
+  let taco = await Taco.findOne({ _id: "62056e13d30a1cb15f585ce5" /* chorizo (external data) */ })
+      .populate('burritoSchema')
+      .lean()
+      .exec(testFunction());
   console.log('Taco found:', taco);
+}
+
+function testFunction() {
+  console.log('testFunction 1234');
 }
