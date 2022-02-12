@@ -52,10 +52,3 @@ async function main() {
     console.log('shimmed findOne() failed:', err);
   }
 }
-
-
-// Populate MongoDB with some sample data
-async function populateData(t) {
-	// Add some test data
-	
-}
