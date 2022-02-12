@@ -39,8 +39,8 @@ async function main() {
   // populate some test data in MongoDB
   // the shim methods can be bypassed by using _mg, the original underlying Mongoose model
   await Taco._mg.deleteMany()
-	await new Taco._mg({ protein: 'beef', spicy: false }).save()
-	await new Taco._mg({ protein: 'chicken', spicy: true }).save()
+  await new Taco._mg({ protein: 'beef', spicy: false }).save()
+  await new Taco._mg({ protein: 'chicken', spicy: true }).save()
   console.log('Tacos in MongoDB:', await Taco._mg.find());
 
   // this findOne call will bypass Mongoose entirely and fetch from our API instead
