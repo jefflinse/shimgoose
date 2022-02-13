@@ -48,10 +48,7 @@ Model.prototype.findOne = async function(filter) {
     return null;
   }
 
-  // assign ID and create model
-  let taco = data[0];
-  taco._id = taco.mongo_id
-  let t = await this._mg.create(data);
+  let t = new this._mg(data[0]);
 
   // run post-hooks
   runHooks(this, 'post', 'findOne');
