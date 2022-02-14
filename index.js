@@ -68,12 +68,13 @@ async function main() {
     console.log('Taco found:', taco);
     console.log('doc is instanceof mongoose.Model?', taco instanceof mongoose.Model);
     console.log('doc is instanceof mongoose.Document?', taco instanceof mongoose.Document);
+    console.log("")
   } catch (err) {
     console.log('shimmed Model.findOne() failed:', err);
   }
 
   // this save() call will bypass Mongoose and save using our API instead
-  console.log('attempting to create a taco');
+  console.log('attempting to create a taco (save() returning a promise)');
   try {
     let taco = await Taco.new({ protein: 'alligator', spicy: false }).save();
     console.log('Taco created:', taco);
@@ -82,6 +83,18 @@ async function main() {
   } catch (err) {
     console.log('shimmed Document.save() failed:', err);
   }
+
+  // can also use save() with a callback instead of returning a promise
+  console.log('attempting to create a taco (save() invoking a callback)');
+  Taco.new({protein: 'black bean', spicy: true}).save((err, taco) => {
+    if (err) {
+      console.log('shimmed Document.save() failed:', err);
+    } else {
+      console.log('Taco created:', taco);
+      console.log('doc is instanceof mongoose.Model?', taco instanceof mongoose.Model);
+      console.log('doc is instanceof mongoose.Document?', taco instanceof mongoose.Document);
+    }
+  })
 
   // this find() call will bypass Mongoose and fetch using our API instead
   console.log('attempting to find all tacos');
