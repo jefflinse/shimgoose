@@ -1,15 +1,16 @@
 // Some "external" data residing in a 3rd party API
 const externalTacoData = {
-  "62056e13d30a1cb15f585ce4": [{ mongo_id: "62056e13d30a1cb15f585ce4", protein: "fish", spicy: false }],
-  "62056e13d30a1cb15f585ce5": [{ mongo_id: "62056e13d30a1cb15f585ce5", protein: "chorizo", spicy: true }],
-  "62056e13d30a1cb15f585ce6": [{ mongo_id: "62056e13d30a1cb15f585ce6", protein: "carne asada", spicy: false }],
-  "62056e13d30a1cb15f585ce7": [{ mongo_id: "62056e13d30a1cb15f585ce7", protein: "tofu", spicy: false }],
-  "62056e13d30a1cb15f585ce8": [{ mongo_id: "62056e13d30a1cb15f585ce8", protein: "black bean", spicy: true }],
+  "62056e13d30a1cb15f585ce4": [{ mongo_id: "62056e13d30a1cb15f585ce4", protein: "chicken", spicy: false }],
+  "62056e13d30a1cb15f585ce5": [{ mongo_id: "62056e13d30a1cb15f585ce5", protein: "beef", spicy: true }],
+  "62056e13d30a1cb15f585ce6": [{ mongo_id: "62056e13d30a1cb15f585ce6", protein: "chorizo", spicy: false }],
 };
 
 // Simulate an external API call that creates a Taco.
 async function createTaco(taco) {
-  return externalTacoData[taco._id] = [taco]
+  taco.mongo_id = taco._id
+  taco._id = undefined
+  externalTacoData[taco.mongo_id] = [taco]
+  return taco
 }
 
 // Simulate an external API call that returns a Taco by its Mongo ID.

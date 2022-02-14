@@ -42,7 +42,15 @@ function Model(name, schema) {
 }
 
 Model.prototype.new = function(data) {
-  return new Document(this, data);
+  let doc = new this._mgModel(data);
+  if (data.mongo_id) {
+    doc._id = data.mongo_id;
+  }
+
+  doc._model = this;
+  doc._runDocumentHooks = _runDocumentHooks.bind(doc)
+  doc.save = saveTaco.bind(doc);
+  return doc;
 }
 
 Model.prototype.deleteMany = async function(filter) {
@@ -97,35 +105,36 @@ Model.prototype._runQueryHooks = function(query, phase, event) {
   }
 }
 
-function Document(model, data) {
-  this._model = model
-  this._mgDocument = new this._model._mgModel(data);
-}
-
-Document.prototype.save = function(cb) {
+function saveTaco(cb) {
   this._runDocumentHooks('pre', 'save');
 
   // save data to external API
   console.log('invoking external API')
-  return externalapi.createTaco(this._mgDocument.toObject())
+  let result = externalapi.createTaco(this.toObject())
     .then(data => {
       this._runDocumentHooks('post', 'save');
-      if (cb) {
-        cb(null, data);
-        return
+      if (data)  {
+        return this._model.new(data);
+      } else {
+        return null;
       }
-
-      return Promise.resolve(data);
     })
+
+  if (cb) {
+    result.then(data => cb(null, data));
+    return
+  }
+
+  return result
 }
 
 // Runs hooks synchronously and sequentially. Probably not what we want.
-Document.prototype._runDocumentHooks = function(phase, event) {
+function _runDocumentHooks (phase, event) {
   const hooks = this._model._schema.hooks[phase][event];
   if (hooks) {
     for (let i = 0; i < hooks.length; i++) {
       const nextFn = () => console.log(`invoked ${this._model.name} ${phase} ${event} hook #${i}`);
-      hooks[i].call(this._mgDocument, nextFn.bind(this._mgDocument));
+      hooks[i].call(this, nextFn.bind(this));
     }
   }
 }

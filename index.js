@@ -52,30 +52,43 @@ async function main() {
   // create the shim model using the shim schema
   const Taco = shimgoose.model('Taco', tacoSchema);
 
-  // populate some test data in MongoDB
-  // the shim methods can be bypassed by using _mg, the original underlying Mongoose model
-  await Taco.deleteMany()
-  await Taco.new({ protein: 'beef', spicy: false })._mgDocument.save()
-  await Taco.new({ protein: 'chicken', spicy: true })._mgDocument.save()
-  console.log('Tacos in MongoDB:', await Taco.find());
-
-  // this findOne call will bypass Mongoose entirely and fetch from our API instead
-  console.log('attempting to find a taco');
+  // this find() call will bypass Mongoose and fetch using our API instead
+  console.log('attempting to find all tacos');
   try {
-    let taco = await Taco.findOne({ _id: "62056e13d30a1cb15f585ce5" /* chorizo (external data) */ });
-    console.log('Taco found:', taco._mgDocument);
+    let tacos = await Taco.find();
+    console.log('Tacos found:', tacos);
   } catch (err) {
-    console.log('shimmed findOne() failed:', err);
+    console.log('shimmed Model.find() failed:', err);
   }
 
+  // this findOne() call will bypass Mongoose and fetch using our API instead
+  console.log('attempting to find a taco');
+  try {
+    let taco = await Taco.findOne({ _id: "62056e13d30a1cb15f585ce6" /* chorizo (external data) */ });
+    console.log('Taco found:', taco);
+    console.log('doc is instanceof mongoose.Model?', taco instanceof mongoose.Model);
+    console.log('doc is instanceof mongoose.Document?', taco instanceof mongoose.Document);
+  } catch (err) {
+    console.log('shimmed Model.findOne() failed:', err);
+  }
+
+  // this save() call will bypass Mongoose and save using our API instead
   console.log('attempting to create a taco');
   try {
     let taco = await Taco.new({ protein: 'alligator', spicy: false }).save();
     console.log('Taco created:', taco);
+    console.log('doc is instanceof mongoose.Model?', taco instanceof mongoose.Model);
+    console.log('doc is instanceof mongoose.Document?', taco instanceof mongoose.Document);
   } catch (err) {
-    console.log('shimmed save() failed:', err);
+    console.log('shimmed Document.save() failed:', err);
   }
 
-  console.log('Tacos in MongoDB:', await Taco._mgModel.find());
-  console.log('Tacos in External:', await Taco.find());
+  // this find() call will bypass Mongoose and fetch using our API instead
+  console.log('attempting to find all tacos');
+  try {
+    let tacos = await Taco.find();
+    console.log('Tacos found:', tacos);
+  } catch (err) {
+    console.log('shimmed Model.find() failed:', err);
+  }
 }
