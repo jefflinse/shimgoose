@@ -68,7 +68,6 @@ async function main() {
     console.log('Taco found:', taco);
     console.log('doc is instanceof mongoose.Model?', taco instanceof mongoose.Model);
     console.log('doc is instanceof mongoose.Document?', taco instanceof mongoose.Document);
-    console.log("")
   } catch (err) {
     console.log('shimmed Model.findOne() failed:', err);
   }
