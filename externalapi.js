@@ -6,7 +6,7 @@ const externalTacoData = {
 };
 
 // Simulate an external API call that creates a Taco.
-async function createTaco(taco) {
+async function saveTaco(taco) {
   taco.mongo_id = taco._id
   taco._id = undefined
   externalTacoData[taco.mongo_id] = [taco]
@@ -22,7 +22,14 @@ async function fetchTacos(mongo_id) {
   return Object.values(externalTacoData).reduce((acc, tacos) => acc.concat(tacos), [])
 }
 
+async function deleteTaco(filter) {
+  console.log("DELETE")
+  delete externalTacoData[filter._id]
+  return {}
+}
+
 module.exports = {
-  createTaco,
+  saveTaco,
   fetchTacos,
+  deleteTaco,
 };

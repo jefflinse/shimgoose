@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const shimgoose = require('./shimgoose');
+const externalapi  = require('./externalapi');
 
 main().catch(err => console.log(err));
 
@@ -48,9 +49,21 @@ async function main() {
     console.log('post save 2');
     next()
   });
+  tacoSchema.post('deleteOne', function(next) {
+    console.log('post deleteOne 1');
+    next()
+  });
+  tacoSchema.post('deleteOne', function(next) {
+    console.log('post deleteOne 2');
+    next()
+  });
 
   // create the shim model using the shim schema
-  const Taco = shimgoose.model('Taco', tacoSchema);
+  const Taco = shimgoose.model('Taco', tacoSchema, {
+    fetch: externalapi.fetchTacos,
+    save: externalapi.saveTaco,
+    delete: externalapi.deleteTaco,
+  });
 
   // this find() call will bypass Mongoose and fetch using our API instead
   console.log('attempting to find all tacos');
@@ -94,6 +107,24 @@ async function main() {
       console.log('doc is instanceof mongoose.Document?', taco instanceof mongoose.Document);
     }
   })
+
+  // this find() call will bypass Mongoose and fetch using our API instead
+  console.log('attempting to find all tacos');
+  try {
+    let tacos = await Taco.find();
+    console.log('Tacos found:', tacos);
+  } catch (err) {
+    console.log('shimmed Model.find() failed:', err);
+  }
+
+  // this deleteOne() call will bypass Mongoose and fetch using our API instead
+  console.log('attempting to delete a taco');
+  try {
+    let result = await Taco.deleteOne({ _id: "62056e13d30a1cb15f585ce6" /* chorizo (external data) */ });
+    console.log(result.deletedCount, 'Taco deleted');
+  } catch (err) {
+    console.log('shimmed Model.deleteOne() failed:', err);
+  }
 
   // this find() call will bypass Mongoose and fetch using our API instead
   console.log('attempting to find all tacos');

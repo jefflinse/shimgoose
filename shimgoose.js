@@ -1,5 +1,4 @@
 const mongoose = require('mongoose');
-const externalapi  = require('./externalapi');
 
 // Schema wraps the Mongoose Schema type and keeps track of pre/post hooks manually.
 function Schema(definition) {
@@ -31,14 +30,16 @@ Schema.prototype.post = function(event, callback) {
 }
 
 // model returns a Document constructor
-function model(name, schema) {
-  return new Model(name, schema);
+function model(name, schema, shimFunctions) {
+  return new Model(name, schema, shimFunctions);
 }
 
-function Model(name, schema) {
+function Model(name, schema, shimFunctions) {
   this.name = name
   this._schema = schema;
   this._mgModel = mongoose.model(this.name, this._schema._mgSchema);
+
+  this._shimFunctions = shimFunctions || {};
 }
 
 Model.prototype.new = function(data) {
@@ -49,7 +50,7 @@ Model.prototype.new = function(data) {
 
   doc._model = this;
   doc._runDocumentHooks = _runDocumentHooks.bind(doc)
-  doc.save = saveTaco.bind(doc);
+  doc.save = createSaveDocumentShim(this._shimFunctions.save).bind(doc);
   return doc;
 }
 
@@ -63,7 +64,7 @@ Model.prototype.find = async function(filter) {
 
   // fetch data from external API
   console.log('invoking external API')
-  let data = await externalapi.fetchTacos()
+  let data = await this._shimFunctions.fetch(filter)
   if (data.length === 0) {
     return [];
   }
@@ -81,7 +82,7 @@ Model.prototype.findOne = async function(filter) {
 
   // fetch data from external API
   console.log('invoking external API')
-  let data = await externalapi.fetchTacos(filter._id)
+  let data = await this._shimFunctions.fetch(filter._id)
   if (data.length === 0) {
     return null;
   }
@@ -91,6 +92,25 @@ Model.prototype.findOne = async function(filter) {
   this._runQueryHooks(query, 'post', 'findOne');
 
   return doc;
+}
+
+Model.prototype.deleteOne = async function (filter) {
+  let query = this._mgModel.deleteOne(filter); // create a mongoose Query
+  this._runQueryHooks(query, 'pre', 'deleteOne');
+
+  // delete data using external API
+  console.log('invoking external API')
+  try {
+    await this._shimFunctions.delete(filter)
+    this._runQueryHooks(query, 'post', 'deleteOne');
+    return {
+      deletedCount: 1,
+    }
+  } catch (e) {
+    return {
+      deletedCount: 0,
+    }
+  }
 }
 
 Model.prototype._runQueryHooks = function(query, phase, event) {
@@ -105,27 +125,29 @@ Model.prototype._runQueryHooks = function(query, phase, event) {
   }
 }
 
-function saveTaco(cb) {
-  this._runDocumentHooks('pre', 'save');
+function createSaveDocumentShim(saveEntityFn) {
+  return function save(cb) {
+    this._runDocumentHooks('pre', 'save');
 
-  // save data to external API
-  console.log('invoking external API')
-  let result = externalapi.createTaco(this.toObject())
-    .then(data => {
-      this._runDocumentHooks('post', 'save');
-      if (data)  {
-        return this._model.new(data);
-      } else {
-        return null;
-      }
-    })
+    // save data to external API
+    console.log('invoking external API')
+    let result = saveEntityFn(this.toObject())
+      .then(data => {
+        this._runDocumentHooks('post', 'save');
+        if (data)  {
+          return this._model.new(data);
+        } else {
+          return null;
+        }
+      })
 
-  if (cb) {
-    result.then(data => cb(null, data));
-    return
+    if (cb) {
+      result.then(data => cb(null, data));
+      return;
+    }
+
+    return result;
   }
-
-  return result
 }
 
 // Runs hooks synchronously and sequentially. Probably not what we want.
