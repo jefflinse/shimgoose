@@ -29,6 +29,9 @@ async function updateTaco(taco) {
 async function getOneTaco(mongo_id) {
   console.log("external getOneTaco() API called");
   if (mongo_id) {
+    taco = externalTacoData[mongo_id]
+    taco._id = taco.mongo_id
+    taco.mongo_id = undefined
     return externalTacoData[mongo_id]
   }
 

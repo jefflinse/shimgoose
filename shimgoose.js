@@ -161,7 +161,6 @@ mongoose.Model.prototype.$__handleSave = function(options, callback) {
         const obj = this.toObject();
         funcs['update'](obj)
           .then(doc => {
-            ret 
             callback(null, {
               matchedCount: 1,
               modifiedCount: 1,

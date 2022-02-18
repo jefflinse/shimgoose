@@ -110,10 +110,20 @@ async function main() {
   }
 
   // this save() call will bypass Mongoose and save using our API instead
-  console.log('attempting to create a taco (save() returning a promise)');
+  console.log('attempting to create a taco');
   try {
     taco = await new Taco({ protein: 'alligator', spicy: false }).save();
     console.log('Taco created:', taco);
+  } catch (err) {
+    console.log('shimmed Document.save() failed:', err);
+  }
+
+  // this save() call will bypass Mongoose and save using our API instead
+  console.log('attempting to update a taco');
+  try {
+    taco.spicy = true;
+    await taco.save();
+    console.log('Taco updated:', taco);
   } catch (err) {
     console.log('shimmed Document.save() failed:', err);
   }
