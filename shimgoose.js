@@ -2,10 +2,22 @@ const mongoose = require('mongoose');
 
 // Schema wraps the Mongoose Schema type and keeps track of pre/post hooks manually.
 function Schema(definition) {
-  this._mgSchema = new mongoose.Schema(definition);
   this.hooks = {
     pre: {},
     post: {}
+  }
+  if(definition instanceof mongoose.Schema) {
+    var schema = this;
+
+    this._mgSchema = definition;
+    definition.s.hooks._pres.forEach((values, key) => {
+      values.forEach(_pre => schema.pre(key, _pre.fn));
+    });
+    definition.s.hooks._posts.forEach((values, key) => {
+      values.forEach(_post => schema.post(key, _post.fn));
+    });
+  } else {
+    this._mgSchema = new mongoose.Schema(definition);
   }
 }
 
