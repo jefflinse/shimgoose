@@ -70,6 +70,14 @@ async function main() {
     console.log('post save 2');
     next()
   });
+  tacoSchema.pre('deleteOne', function(next) {
+    console.log('post deleteOne 1');
+    next()
+  });
+  tacoSchema.pre('deleteOne', function(next) {
+    console.log('post deleteOne 2');
+    next()
+  });
   tacoSchema.post('deleteOne', function(doc, next) {
     console.log('post deleteOne 1');
     next()
