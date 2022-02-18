@@ -1,167 +1,158 @@
 const mongoose = require('mongoose');
+const applyWriteConcern = require('./node_modules/mongoose/lib/helpers/schema/applyWriteConcern');
 
-// Schema wraps the Mongoose Schema type and keeps track of pre/post hooks manually.
-function Schema(definition) {
-  this._mgSchema = new mongoose.Schema(definition);
-  this.hooks = {
-    pre: {},
-    post: {}
-  }
-}
-
-// Adds a pre-hook to the schema.
-// event: string ('findOne', 'save', etc.)
-// callback: function(next)
-Schema.prototype.pre = function(event, callback) {
-if (this.hooks.pre[event] === undefined) {
-  this.hooks.pre[event] = [];
-}
-  this.hooks.pre[event].push(callback);
-}
-
-// Adds a post-hook to the schema.
-// event: string ('findOne', 'save', etc.)
-// callback: function(next)
-Schema.prototype.post = function(event, callback) {
-  if (this.hooks.post[event] === undefined) {
-    this.hooks.post[event] = [];
-  }
-  this.hooks.post[event].push(callback);
-}
-
-// model returns a Document constructor
-function model(name, schema, shimFunctions) {
-  return new Model(name, schema, shimFunctions);
-}
-
-function Model(name, schema, shimFunctions) {
-  this.name = name
-  this._schema = schema;
-  this._mgModel = mongoose.model(this.name, this._schema._mgSchema);
-
-  this._shimFunctions = shimFunctions || {};
-}
-
-Model.prototype.new = function(data) {
-  let doc = new this._mgModel(data);
-  if (data.mongo_id) {
-    doc._id = data.mongo_id;
-  }
-
-  doc._model = this;
-  doc._runDocumentHooks = _runDocumentHooks.bind(doc)
-  doc.save = createSaveDocumentShim(this._shimFunctions.save).bind(doc);
-  return doc;
-}
-
-Model.prototype.deleteMany = async function(filter) {
-  return await this._mgModel.deleteMany(filter);
-}
-
-Model.prototype.find = async function(filter) {
-  let query = this._mgModel.find(filter); // create a mongoose Query
-  this._runQueryHooks(query, 'pre', 'find');
-
-  // fetch data from external API
-  console.log('invoking external API')
-  let data = await this._shimFunctions.fetch(filter)
-  if (data.length === 0) {
-    return [];
-  }
-
-  const tacos = data.map(t => this.new(t));
-
-  this._runQueryHooks(query, 'post', 'find');
-
-  return tacos;
-}
-
-Model.prototype.findOne = async function(filter) {
-  let query = this._mgModel.findOne(filter); // create a mongoose Query
-  this._runQueryHooks(query, 'pre', 'findOne');
-
-  // fetch data from external API
-  console.log('invoking external API')
-  let data = await this._shimFunctions.fetch(filter._id)
-  if (data.length === 0) {
-    return null;
-  }
-
-  const doc = this.new(data[0]);
-
-  this._runQueryHooks(query, 'post', 'findOne');
-
-  return doc;
-}
-
-Model.prototype.deleteOne = async function (filter) {
-  let query = this._mgModel.deleteOne(filter); // create a mongoose Query
-  this._runQueryHooks(query, 'pre', 'deleteOne');
-
-  // delete data using external API
-  console.log('invoking external API')
-  try {
-    await this._shimFunctions.delete(filter)
-    this._runQueryHooks(query, 'post', 'deleteOne');
-    return {
-      deletedCount: 1,
+function wrapModel(model) {
+  mongoose.Model.prototype.$__handleSave = function(options, callback) {
+    const _this = this;
+    let saveOptions = {};
+  
+    applyWriteConcern(this.$__schema, options);
+    if (typeof options.writeConcern !== 'undefined') {
+      saveOptions.writeConcern = {};
+      if ('w' in options.writeConcern) {
+        saveOptions.writeConcern.w = options.writeConcern.w;
+      }
+      if ('j' in options.writeConcern) {
+        saveOptions.writeConcern.j = options.writeConcern.j;
+      }
+      if ('wtimeout' in options.writeConcern) {
+        saveOptions.writeConcern.wtimeout = options.writeConcern.wtimeout;
+      }
+    } else {
+      if ('w' in options) {
+        saveOptions.w = options.w;
+      }
+      if ('j' in options) {
+        saveOptions.j = options.j;
+      }
+      if ('wtimeout' in options) {
+        saveOptions.wtimeout = options.wtimeout;
+      }
     }
-  } catch (e) {
-    return {
-      deletedCount: 0,
+    if ('checkKeys' in options) {
+      saveOptions.checkKeys = options.checkKeys;
     }
-  }
-}
-
-Model.prototype._runQueryHooks = function(query, phase, event) {
-  console.log(`running ${this.name} ${phase} ${event} hooks`);
-
-  const hooks = this._schema.hooks[phase][event];
-  if (hooks) {
-    for (let i = 0; i < hooks.length; i++) {
-      const nextFn = () => console.log(`invoked ${this.name} ${phase} ${event} hook #${i}`);
-      hooks[i].call(query, nextFn.bind(query));
+    const session = this.$session();
+    if (!saveOptions.hasOwnProperty('session')) {
+      saveOptions.session = session;
     }
-  }
-}
+  
+    if (Object.keys(saveOptions).length === 0) {
+      saveOptions = null;
+    }
+    if (this.$isNew) {
+      // send entire doc
+      // SHIM
+      const obj = this.toObject();
+      // const obj = this.toObject(saveToObjectOptions);
+      if ((obj || {})._id === void 0) {
+        // documents must have an _id else mongoose won't know
+        // what to update later if more changes are made. the user
+        // wouldn't know what _id was generated by mongodb either
+        // nor would the ObjectId generated by mongodb necessarily
+        // match the schema definition.
+        immediate(function() {
+          callback(new MongooseError('document must have an _id before saving'));
+        });
+        return;
+      }
+  
+      this.$__version(true, obj);
 
-function createSaveDocumentShim(saveEntityFn) {
-  return function save(cb) {
-    this._runDocumentHooks('pre', 'save');
+      // SHIM
+      // this[modelCollectionSymbol].insertOne(obj, saveOptions, function(err, ret) {
+      //   if (err) {
+      //     _setIsNew(_this, true);
+  
+      //     callback(err, null);
+      //     return;
+      //   }
+  
+      //   callback(null, ret);
+      // });
+      console.log("faking INSERT");
+      callback(null, {
+        insertedCount: 1,
+        ops: [{
+          _id: obj._id,
+          ...obj
+        }]
+      });
 
-    // save data to external API
-    console.log('invoking external API')
-    let result = saveEntityFn(this.toObject())
-      .then(data => {
-        this._runDocumentHooks('post', 'save');
-        if (data)  {
-          return this._model.new(data);
-        } else {
-          return null;
+      this.$__reset();
+      _setIsNew(this, false);
+      // Make it possible to retry the insert
+      this.$__.inserting = true;
+    } else {
+      // Make sure we don't treat it as a new object on error,
+      // since it already exists
+      this.$__.inserting = false;
+  
+      const delta = this.$__delta();
+      if (delta) {
+        if (delta instanceof MongooseError) {
+          callback(delta);
+          return;
         }
-      })
-
-    if (cb) {
-      result.then(data => cb(null, data));
-      return;
+  
+        const where = this.$__where(delta[0]);
+        if (where instanceof MongooseError) {
+          callback(where);
+          return;
+        }
+  
+        _applyCustomWhere(this, where);
+        this[modelCollectionSymbol].updateOne(where, delta[1], saveOptions, (err, ret) => {
+          if (err) {
+            this.$__undoReset();
+  
+            callback(err);
+            return;
+          }
+          ret.$where = where;
+          callback(null, ret);
+        });
+      } else {
+        const optionsWithCustomValues = Object.assign({}, options, saveOptions);
+        const where = this.$__where();
+        if (this.$__schema.options.optimisticConcurrency) {
+          const key = this.$__schema.options.versionKey;
+          const val = this.$__getValue(key);
+          if (val != null) {
+            where[key] = val;
+          }
+        }
+        this.constructor.exists(where, optionsWithCustomValues)
+          .then(documentExists => {
+            const matchedCount = !documentExists ? 0 : 1;
+            callback(null, { $where: where, matchedCount });
+          })
+          .catch(callback);
+        return;
+      }
+  
+      // store the modified paths before the document is reset
+      this.$__.modifiedPaths = this.modifiedPaths();
+      this.$__reset();
+  
+      _setIsNew(this, false);
     }
+  };
 
-    return result;
-  }
+  return model
 }
 
-// Runs hooks synchronously and sequentially. Probably not what we want.
-function _runDocumentHooks (phase, event) {
-  const hooks = this._model._schema.hooks[phase][event];
-  if (hooks) {
-    for (let i = 0; i < hooks.length; i++) {
-      const nextFn = () => console.log(`invoked ${this._model.name} ${phase} ${event} hook #${i}`);
-      hooks[i].call(this, nextFn.bind(this));
-    }
+function _setIsNew(doc, val) {
+  doc.$isNew = val;
+  doc.$emit('isNew', val);
+  doc.constructor.emit('isNew', val);
+
+  const subdocs = doc.$getAllSubdocs();
+  for (const subdoc of subdocs) {
+    subdoc.$isNew = val;
   }
 }
 
 module.exports = {
-  Schema,
-  model,
+  wrapModel,
 };
