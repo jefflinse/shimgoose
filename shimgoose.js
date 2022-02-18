@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const MongooseError = require('./node_modules/mongoose/lib/error/mongooseError');
 const applyGlobalMaxTimeMS = require('./node_modules/mongoose/lib/helpers/query/applyGlobalMaxTimeMS');
 const wrapThunk = require('./node_modules/mongoose/lib/helpers/query/wrapThunk');
 
@@ -208,6 +209,64 @@ mongoose.Model.prototype.$__handleSave = function(options, callback) {
   }
 };
 
+mongoose.Model.prototype.$__remove = function $__remove(options, cb) {
+  if (this.$__.isDeleted) {
+    return immediate(() => cb(null, this));
+  }
+
+  const where = this.$__where();
+  if (where instanceof MongooseError) {
+    return cb(where);
+  }
+
+  _applyCustomWhere(this, where);
+
+  const session = this.$session();
+  if (!options.hasOwnProperty('session')) {
+    options.session = session;
+  }
+
+  // ORIGINAL MONGOOSE LOGIC
+
+  // this[modelCollectionSymbol].deleteOne(where, options, err => {
+  //   if (!err) {
+  //     this.$__.isDeleted = true;
+  //     this.$emit('remove', this);
+  //     this.constructor.emit('remove', this);
+  //     return cb(null, this);
+  //   }
+  //   this.$__.isDeleted = false;
+  //   cb(err);
+  // });
+
+  // SHIMMED LOGIC
+  if (modelShimFunctions.hasOwnProperty(this.__proto__.collection.modelName)) {
+    const funcs = modelShimFunctions[this.__proto__.collection.modelName];
+    funcs['delete'](this._id)
+      .then(() => {
+        this.$__.isDeleted = true;
+        this.$emit('remove', this);
+        this.constructor.emit('remove', this);
+        return cb(null, this);
+      })
+      .catch(err => {
+        this.$__.isDeleted = false;
+        cb(err);
+      });
+  } else {
+    callback(new Error(`create() shim missing for ${this.__proto__.collection.modelName}`));
+    return null
+  }
+};
+
+function _applyCustomWhere(doc, where) {
+  if (doc.$where == null) {
+    return;
+  }
+  for (const key of Object.keys(doc.$where)) {
+    where[key] = doc.$where[key];
+  }
+}
 
 function _setIsNew(doc, val) {
   doc.$isNew = val;

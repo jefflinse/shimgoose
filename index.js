@@ -78,14 +78,32 @@ async function main() {
     console.log('post deleteOne 2');
     next()
   });
+  tacoSchema.pre('remove', function(next) {
+    console.log('pre remove 1');
+    next()
+  });
+  tacoSchema.pre('remove', function(next) {
+    console.log('pre remove 2');
+    next()
+  });
+  tacoSchema.post('remove', function(doc, next) {
+    console.log('post remove 1');
+    next()
+  });
+  tacoSchema.post('remove', function(doc, next) {
+    console.log('post remove 2');
+    next()
+  });
 
   // create the model as usual
   const Taco = mongoose.model('Taco', tacoSchema);
 
+  let taco;
+
   // this findOne() call will bypass Mongoose and fetch using our API instead
   console.log('attempting to find a taco');
   try {
-    let taco = await Taco.findOne({ _id: "62056e13d30a1cb15f585ce6" /* chorizo (external data) */ });
+    taco = await Taco.findOne({ _id: "62056e13d30a1cb15f585ce6" /* chorizo (external data) */ });
     console.log('Taco found:', taco);
   } catch (err) {
     console.log('shimmed Model.findOne() failed:', err);
@@ -94,46 +112,18 @@ async function main() {
   // this save() call will bypass Mongoose and save using our API instead
   console.log('attempting to create a taco (save() returning a promise)');
   try {
-    let taco = await new Taco({ protein: 'alligator', spicy: false }).save();
+    taco = await new Taco({ protein: 'alligator', spicy: false }).save();
     console.log('Taco created:', taco);
   } catch (err) {
     console.log('shimmed Document.save() failed:', err);
   }
 
-  // can also use save() with a callback instead of returning a promise
-  console.log('attempting to create a taco (save() invoking a callback)');
-  let taco = new Taco({protein: 'black bean', spicy: true}).save((err, taco) => {
-    if (err) {
-      console.log('shimmed Document.save() failed:', err);
-    } else {
-      console.log('Taco created:', taco);
-    }
-  })
-
-  // this find() call will bypass Mongoose and fetch using our API instead
-  console.log('attempting to find all tacos');
-  try {
-    let tacos = await Taco.find();
-    console.log('Tacos found:', tacos);
-  } catch (err) {
-    console.log('shimmed Model.find() failed:', err);
-  }
-
-  // this deleteOne() call will bypass Mongoose and fetch using our API instead
+  // this deleteOne() call will bypass Mongoose and delete using our API instead
   console.log('attempting to delete a taco');
   try {
-    let result = await Taco.deleteOne({ _id: "62056e13d30a1cb15f585ce6" /* chorizo (external data) */ });
-    console.log(result.deletedCount, 'Taco deleted');
+    await taco.delete();
+    console.log('Taco deleted');
   } catch (err) {
-    console.log('shimmed Model.deleteOne() failed:', err);
-  }
-
-  // this find() call will bypass Mongoose and fetch using our API instead
-  console.log('attempting to find all tacos');
-  try {
-    let tacos = await Taco.find();
-    console.log('Tacos found:', tacos);
-  } catch (err) {
-    console.log('shimmed Model.find() failed:', err);
+    console.log('shimmed Query.remove() failed:', err);
   }
 }
