@@ -1,5 +1,10 @@
 const mongoose = require('mongoose');
+
+// importing the shim library will automatically shim all of the Mongoose
+// models and documents for CRUD operations.
 const shimgoose = require('./shimgoose');
+
+// A fake external API just to demonstration purposes.
 const externalapi  = require('./externalapi');
 
 main().catch(err => console.log(err));
@@ -10,7 +15,7 @@ async function main() {
   //   authSource: 'admin'
   // });
   
-  // use shim schema to make sure hooks are intercepted and registered properly
+  // create the schema as usual
   const tacoSchema = new mongoose.Schema({
     protein: String,
     spicy: Boolean,
@@ -58,8 +63,8 @@ async function main() {
     next()
   });
 
-  // create the shim model using the shim schema
-  const Taco = shimgoose.wrapModel(mongoose.model('Taco', tacoSchema));
+  // create the model as usual
+  const Taco = mongoose.model('Taco', tacoSchema);
 
   // this find() call will bypass Mongoose and fetch using our API instead
   // console.log('attempting to find all tacos');
