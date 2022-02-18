@@ -76,15 +76,15 @@ async function main() {
   // }
 
   // this findOne() call will bypass Mongoose and fetch using our API instead
-  // console.log('attempting to find a taco');
-  // try {
-  //   let taco = await Taco.findOne({ _id: "62056e13d30a1cb15f585ce6" /* chorizo (external data) */ });
-  //   console.log('Taco found:', taco);
-  //   console.log('doc is instanceof mongoose.Model?', taco instanceof mongoose.Model);
-  //   console.log('doc is instanceof mongoose.Document?', taco instanceof mongoose.Document);
-  // } catch (err) {
-  //   console.log('shimmed Model.findOne() failed:', err);
-  // }
+  console.log('attempting to find a taco');
+  try {
+    let taco = await Taco.findOne({ _id: "62056e13d30a1cb15f585ce6" /* chorizo (external data) */ });
+    console.log('Taco found:', taco);
+    console.log('doc is instanceof mongoose.Model?', taco instanceof mongoose.Model);
+    console.log('doc is instanceof mongoose.Document?', taco instanceof mongoose.Document);
+  } catch (err) {
+    console.log('shimmed Model.findOne() failed:', err);
+  }
 
   // this save() call will bypass Mongoose and save using our API instead
   console.log('attempting to create a taco (save() returning a promise)');

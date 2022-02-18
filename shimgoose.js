@@ -1,5 +1,38 @@
 const mongoose = require('mongoose');
-const applyWriteConcern = require('./node_modules/mongoose/lib/helpers/schema/applyWriteConcern');
+const applyGlobalMaxTimeMS = require('./node_modules/mongoose/lib/helpers/query/applyGlobalMaxTimeMS');
+const wrapThunk = require('./node_modules/mongoose/lib/helpers/query/wrapThunk');
+
+mongoose.Query.prototype._findOne = wrapThunk(function(callback) {
+  this._castConditions();
+
+  if (this.error()) {
+    callback(this.error());
+    return null;
+  }
+
+  this._applyPaths();
+  this._fields = this._castFields(this._fields);
+
+  applyGlobalMaxTimeMS(this.options, this.model);
+
+  // don't pass in the conditions because we already merged them in
+  // Query.base.findOne.call(this, {}, (err, doc) => {
+  //   if (err) {
+  //     callback(err);
+  //     return null;
+  //   }
+
+  //   this._completeOne(doc, null, _wrapThunkCallback(this, callback));
+  // });
+
+  console.log("faking FINDONE");
+  const doc = new  this.model({
+    protein: "shimgoose",
+    spicy: true,
+  });
+
+  this._completeOne(doc, null, _wrapThunkCallback(this, callback));
+});
 
 mongoose.Model.prototype.$__handleSave = function(options, callback) {
   const _this = this;
@@ -99,6 +132,24 @@ function _setIsNew(doc, val) {
   for (const subdoc of subdocs) {
     subdoc.$isNew = val;
   }
+}
+
+function _wrapThunkCallback(query, cb) {
+  return function(error, res) {
+    if (error != null) {
+      return cb(error);
+    }
+
+    for (const fn of query._transforms) {
+      try {
+        res = fn(res);
+      } catch (error) {
+        return cb(error);
+      }
+    }
+
+    return cb(null, res);
+  };
 }
 
 module.exports = {};
