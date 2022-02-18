@@ -7,6 +7,22 @@ const shimgoose = require('./shimgoose');
 // A fake external API just to demonstration purposes.
 const externalapi  = require('./externalapi');
 
+// Register CRUD functions for the model.
+shimgoose.registerModelShims('Taco', {
+  'getOne': function(id) {
+    return externalapi.getOneTaco(id);
+  },
+  'create': function(obj) {
+    return externalapi.createTaco(obj);
+  },
+  'update': function(obj) {
+    return externalapi.updateTaco(obj);
+  },
+  'delete': function(id) {
+    return externalapi.deleteTaco(id);
+  },
+});
+
 main().catch(err => console.log(err));
 
 async function main() {
@@ -66,22 +82,11 @@ async function main() {
   // create the model as usual
   const Taco = mongoose.model('Taco', tacoSchema);
 
-  // this find() call will bypass Mongoose and fetch using our API instead
-  // console.log('attempting to find all tacos');
-  // try {
-  //   let tacos = await Taco.find();
-  //   console.log('Tacos found:', tacos);
-  // } catch (err) {
-  //   console.log('shimmed Model.find() failed:', err);
-  // }
-
   // this findOne() call will bypass Mongoose and fetch using our API instead
   console.log('attempting to find a taco');
   try {
     let taco = await Taco.findOne({ _id: "62056e13d30a1cb15f585ce6" /* chorizo (external data) */ });
     console.log('Taco found:', taco);
-    console.log('doc is instanceof mongoose.Model?', taco instanceof mongoose.Model);
-    console.log('doc is instanceof mongoose.Document?', taco instanceof mongoose.Document);
   } catch (err) {
     console.log('shimmed Model.findOne() failed:', err);
   }
@@ -91,8 +96,6 @@ async function main() {
   try {
     let taco = await new Taco({ protein: 'alligator', spicy: false }).save();
     console.log('Taco created:', taco);
-    console.log('doc is instanceof mongoose.Model?', taco instanceof mongoose.Model);
-    console.log('doc is instanceof mongoose.Document?', taco instanceof mongoose.Document);
   } catch (err) {
     console.log('shimmed Document.save() failed:', err);
   }
@@ -104,8 +107,6 @@ async function main() {
       console.log('shimmed Document.save() failed:', err);
     } else {
       console.log('Taco created:', taco);
-      console.log('doc is instanceof mongoose.Model?', taco instanceof mongoose.Model);
-      console.log('doc is instanceof mongoose.Document?', taco instanceof mongoose.Document);
     }
   })
 

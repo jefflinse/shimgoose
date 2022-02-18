@@ -2,6 +2,23 @@ const mongoose = require('mongoose');
 const applyGlobalMaxTimeMS = require('./node_modules/mongoose/lib/helpers/query/applyGlobalMaxTimeMS');
 const wrapThunk = require('./node_modules/mongoose/lib/helpers/query/wrapThunk');
 
+let modelShimFunctions = {};
+
+// Registers CRUD functions for a given model to be called in place of MongoDB calls.
+// Each function should return a promise.
+//
+// Example:
+//
+// shimgoose.registerModelShims('Taco', {
+//   getOne: myFindFunc,
+//   create: myCreateFunc,
+//   update: myUpdateFunc,
+//   delete: myDeleteFunc,
+// });
+function registerModelShims(modelName, funcMap) {
+  modelShimFunctions[modelName] = funcMap
+}
+
 mongoose.Query.prototype._findOne = wrapThunk(function(callback) {
   this._castConditions();
 
@@ -15,6 +32,8 @@ mongoose.Query.prototype._findOne = wrapThunk(function(callback) {
 
   applyGlobalMaxTimeMS(this.options, this.model);
 
+  // ORIGINAL MONGOOSE LOGIC
+
   // don't pass in the conditions because we already merged them in
   // Query.base.findOne.call(this, {}, (err, doc) => {
   //   if (err) {
@@ -25,13 +44,21 @@ mongoose.Query.prototype._findOne = wrapThunk(function(callback) {
   //   this._completeOne(doc, null, _wrapThunkCallback(this, callback));
   // });
 
-  console.log("faking FINDONE");
-  const doc = new  this.model({
-    protein: "shimgoose",
-    spicy: true,
-  });
-
-  this._completeOne(doc, null, _wrapThunkCallback(this, callback));
+  // SHIMMED LOGIC
+  if (modelShimFunctions.hasOwnProperty(this.mongooseCollection.modelName)) {
+    const funcs = modelShimFunctions[this.mongooseCollection.modelName];
+    funcs['getOne'](this._conditions._id)
+      .then(doc => {
+        this._completeOne(doc, null, _wrapThunkCallback(this, callback));
+      })
+      .catch(err => {
+        callback(err);
+        return null;
+      });
+  } else {
+    callback(new Error(`findOne() shim missing for ${this.mongooseCollection.modelName}`));
+    return null
+  }
 });
 
 mongoose.Model.prototype.$__handleSave = function(options, callback) {
@@ -53,14 +80,42 @@ mongoose.Model.prototype.$__handleSave = function(options, callback) {
 
     this.$__version(true, obj);
 
-    console.log("faking INSERT");
-    callback(null, {
-      insertedCount: 1,
-      ops: [{
-        _id: obj._id,
-        ...obj
-      }]
-    });
+    // ORIGINAL MONGOOSE LOGIC
+
+    // this[modelCollectionSymbol].insertOne(obj, saveOptions, function(err, ret) {
+    //   if (err) {
+    //     _setIsNew(_this, true);
+
+    //     callback(err, null);
+    //     return;
+    //   }
+
+    //   callback(null, ret);
+    // });
+
+    // SHIMMED LOGIC
+    if (modelShimFunctions.hasOwnProperty(this.__proto__.collection.modelName)) {
+      const funcs = modelShimFunctions[this.__proto__.collection.modelName];
+      const obj = this.toObject();
+      funcs['create'](obj)
+        .then(doc => {
+          callback(null, {
+            insertedCount: 1,
+            ops: [{
+              _id: obj._id,
+              ...obj
+            }]
+          });
+        })
+        .catch(err => {
+          _setIsNew(_this, true);
+          callback(err, null);
+          return;
+        });
+    } else {
+      callback(new Error(`create() shim missing for ${this.__proto__.collection.modelName}`));
+      return null
+    }
 
     this.$__reset();
     _setIsNew(this, false);
@@ -85,16 +140,47 @@ mongoose.Model.prototype.$__handleSave = function(options, callback) {
       }
 
       _applyCustomWhere(this, where);
-      console.log("faking UPDATE");
-      callback(null, {
-        matchedCount: 1,
-        modifiedCount: 1,
-        upsertedCount: 0,
-        ops: [{
-          _id: this._id,
-          ...delta[0]
-        }]
-      });
+
+      // ORIGINAL MONGOOSE LOGIC
+
+      // this[modelCollectionSymbol].updateOne(where, delta[1], saveOptions, (err, ret) => {
+      //   if (err) {
+      //     this.$__undoReset();
+
+      //     callback(err);
+      //     return;
+      //   }
+      //   ret.$where = where;
+      //   callback(null, ret);
+      // });
+
+      // SHIMMED LOGIC
+      if (modelShimFunctions.hasOwnProperty(this.__proto__.collection.modelName)) {
+        const funcs = modelShimFunctions[this.__proto__.collection.modelName];
+        const obj = this.toObject();
+        funcs['update'](obj)
+          .then(doc => {
+            ret 
+            callback(null, {
+              matchedCount: 1,
+              modifiedCount: 1,
+              upsertedCount: 0,
+              ops: [{
+                _id: this._id,
+                ...delta[0]
+              }],
+              $where: where,
+            });
+          })
+          .catch(err => {
+            this.$__undoReset();
+            callback(err, null);
+            return;
+          });
+      } else {
+        callback(new Error(`update() shim missing for ${this.__proto__.collection.modelName}`));
+        return null
+      }
     } else {
       const optionsWithCustomValues = Object.assign({}, options, null);
       const where = this.$__where();
@@ -152,4 +238,6 @@ function _wrapThunkCallback(query, cb) {
   };
 }
 
-module.exports = {};
+module.exports = {
+  registerModelShims,
+};
