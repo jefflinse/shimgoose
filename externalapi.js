@@ -38,6 +38,7 @@ async function getOneTaco(mongo_id) {
   return null
 }
 
+// Simulate an external API call that deletes a Taco by its Mongo ID.
 async function deleteTaco(mongo_id) {
   console.log("external deleteTaco() API called");
   delete externalTacoData[mongo_id]

@@ -1,14 +1,11 @@
-const mongoose = require('mongoose');
+// Instead of importing mongoose directly, import it via the shim.
+const { mongoose, registerModelShims } = require('./shim/mongoose');
 
-// importing the shim library will automatically shim all of the Mongoose
-// models and documents for CRUD operations.
-const shimgoose = require('./shimgoose');
-
-// A fake external API just to demonstration purposes.
+// A fake external "Tacos" API just for demonstration purposes.
 const externalapi  = require('./externalapi');
 
 // Register CRUD functions for the model.
-shimgoose.registerModelShims('Taco', {
+registerModelShims('Taco', {
   'getOne': function(id) {
     return externalapi.getOneTaco(id);
   },
@@ -26,80 +23,47 @@ shimgoose.registerModelShims('Taco', {
 main().catch(err => console.log(err));
 
 async function main() {
-  // connect to MongoDB
-  // await mongoose.connect('mongodb://root:example@localhost:27017/test', {
-  //   authSource: 'admin'
-  // });
-  
+
+  // Note that we do not need to connect to the database here.
+  // No actual MongoDB operations are involved.
+
   // create the schema as usual
   const tacoSchema = new mongoose.Schema({
     protein: String,
     spicy: Boolean,
   });
 
-  // these pre/post hooks should continue to work as expected, with caveats
+  // these pre/post hooks should continue to work as expected
   tacoSchema.pre('findOne', function(next) {
     console.log('pre findOne 1');
-    next();
-  });
-  tacoSchema.pre('findOne', function(next) {
-    console.log('pre findOne 2');
     next();
   });
   tacoSchema.post('findOne', function(doc, next) {
     console.log('post findOne 1');
     next()
   });
-  tacoSchema.post('findOne', function(doc, next) {
-    console.log('post findOne 2');
-    next()
-  });
   tacoSchema.pre('save', function(next) {
     console.log('pre save 1');
-    next();
-  });
-  tacoSchema.pre('save', function(next) {
-    console.log('pre save 2');
     next();
   });
   tacoSchema.post('save', function(doc, next) {
     console.log('post save 1');
     next()
   });
-  tacoSchema.post('save', function(doc, next) {
-    console.log('post save 2');
-    next()
-  });
   tacoSchema.pre('deleteOne', function(next) {
     console.log('post deleteOne 1');
     next()
   });
-  tacoSchema.pre('deleteOne', function(next) {
-    console.log('post deleteOne 2');
-    next()
-  });
   tacoSchema.post('deleteOne', function(doc, next) {
     console.log('post deleteOne 1');
-    next()
-  });
-  tacoSchema.post('deleteOne', function(doc, next) {
-    console.log('post deleteOne 2');
     next()
   });
   tacoSchema.pre('remove', function(next) {
     console.log('pre remove 1');
     next()
   });
-  tacoSchema.pre('remove', function(next) {
-    console.log('pre remove 2');
-    next()
-  });
   tacoSchema.post('remove', function(doc, next) {
     console.log('post remove 1');
-    next()
-  });
-  tacoSchema.post('remove', function(doc, next) {
-    console.log('post remove 2');
     next()
   });
 

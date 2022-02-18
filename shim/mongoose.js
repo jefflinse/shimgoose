@@ -1,12 +1,24 @@
 const mongoose = require('mongoose');
-const MongooseError = require('./node_modules/mongoose/lib/error/mongooseError');
-const applyGlobalMaxTimeMS = require('./node_modules/mongoose/lib/helpers/query/applyGlobalMaxTimeMS');
-const wrapThunk = require('./node_modules/mongoose/lib/helpers/query/wrapThunk');
 
+// This is dirty, but we import these from mongoose to reproduce the same
+// mongoose logic while swapping out the specific API calls to MongoDB.
+const MongooseError = require('mongoose/lib/error/mongooseError');
+const applyGlobalMaxTimeMS = require('mongoose/lib/helpers/query/applyGlobalMaxTimeMS');
+const wrapThunk = require('mongoose/lib/helpers/query/wrapThunk');
+
+// All shimmed models and their functions are stored here. It has the form
+//
+// {
+//   modelName: {
+//     functionName: function,
+//     ...
+//   },
+//   ...
+// }
 let modelShimFunctions = {};
 
 // Registers CRUD functions for a given model to be called in place of MongoDB calls.
-// Each function should return a promise.
+// Each function should be an async function (or return a promise).
 //
 // Example:
 //
@@ -20,6 +32,11 @@ function registerModelShims(modelName, funcMap) {
   modelShimFunctions[modelName] = funcMap
 }
 
+// Provides a shim for mongoose's `Model.findOne()` method.
+//
+// The underlying MongoDB query is swapped out for a custom function.
+// Some surrounding logic has been copied from the original implementation
+// to ensure that the shim is fully compatible with the original.
 mongoose.Query.prototype._findOne = wrapThunk(function(callback) {
   this._castConditions();
 
@@ -57,11 +74,16 @@ mongoose.Query.prototype._findOne = wrapThunk(function(callback) {
         return null;
       });
   } else {
-    callback(new Error(`findOne() shim missing for ${this.mongooseCollection.modelName}`));
+    callback(new Error(`getOne() shim missing for ${this.mongooseCollection.modelName}`));
     return null
   }
 });
 
+// Provides a shim for mongoose's `Document.save()` method.
+//
+// The underlying MongoDB query is swapped out for a custom function.
+// Some surrounding logic has been copied from the original implementation
+// to ensure that the shim is fully compatible with the original.
 mongoose.Model.prototype.$__handleSave = function(options, callback) {
   const _this = this;
 
@@ -208,6 +230,11 @@ mongoose.Model.prototype.$__handleSave = function(options, callback) {
   }
 };
 
+// Provides a shim for mongoose's `Document.remove()` method.
+//
+// The underlying MongoDB query is swapped out for a custom function.
+// Some surrounding logic has been copied from the original implementation
+// to ensure that the shim is fully compatible with the original.
 mongoose.Model.prototype.$__remove = function $__remove(options, cb) {
   if (this.$__.isDeleted) {
     return immediate(() => cb(null, this));
@@ -258,6 +285,7 @@ mongoose.Model.prototype.$__remove = function $__remove(options, cb) {
   }
 };
 
+// Copied from mongoose for backwards compatibility.
 function _applyCustomWhere(doc, where) {
   if (doc.$where == null) {
     return;
@@ -267,6 +295,7 @@ function _applyCustomWhere(doc, where) {
   }
 }
 
+// Copied from mongoose for backwards compatibility.
 function _setIsNew(doc, val) {
   doc.$isNew = val;
   doc.$emit('isNew', val);
@@ -278,6 +307,7 @@ function _setIsNew(doc, val) {
   }
 }
 
+// Copied from mongoose for backwards compatibility.
 function _wrapThunkCallback(query, cb) {
   return function(error, res) {
     if (error != null) {
@@ -297,5 +327,6 @@ function _wrapThunkCallback(query, cb) {
 }
 
 module.exports = {
+  mongoose,
   registerModelShims,
 };
